@@ -1,1 +1,109 @@
+# MVP Architecture: Full Guide
 
+Building an MVP (Minimum Viable Product) architecture is about balancing speed-to-market with just enough technical foundation to not paint yourself into a corner. Here's a complete walkthrough.
+
+## 1. Start With the Core Question
+
+Before touching architecture, nail down:
+- **What's the one thing this MVP must prove?** (a hypothesis about users, demand, or a workflow)
+- **What can break, and what can't?** (e.g., payments failing is unacceptable; slow search is tolerable)
+
+Your architecture should serve the hypothesis, not "best practices" for a company you don't have yet.
+
+## 2. MVP Architecture Principles
+
+- **Optimize for iteration speed, not scale.** You don't need Kubernetes for 50 users.
+- **Monolith first.** A single, well-organized codebase is faster to build and debug than microservices. Split later when you actually feel the pain.
+- **Use boring, proven technology.** Novelty adds risk; save creativity for the product, not the infra.
+- **Buy, don't build, for non-core problems.** Auth, payments, email, hosting — use managed services.
+- **Make it easy to throw away.** Some of this code will be rewritten. Don't over-invest in abstractions "just in case."
+
+## 3. Typical MVP Stack (Layer by Layer)
+
+**Frontend**
+- Web: React/Next.js, Vue/Nuxt, or even server-rendered templates if simplicity wins
+- Mobile: React Native or Flutter if you need iOS+Android from one codebase; native only if performance/platform features are core to the hypothesis
+
+**Backend**
+- A single monolithic API (Node/Express, Django, Rails, Laravel, or FastAPI) — pick what your team knows best, not what's trendy
+- REST is fine; skip GraphQL unless you have a concrete reason
+
+**Database**
+- PostgreSQL or MySQL for almost everything — relational databases handle ambiguity well while your data model is still evolving
+- Add Redis only when you have a real caching/queueing need
+
+**Auth**
+- Use a managed provider (Auth0, Clerk, Supabase Auth, Firebase Auth) instead of building your own
+
+**Hosting/Infra**
+- PaaS first: Vercel, Render, Railway, Fly.io, or Heroku
+- Move to raw AWS/GCP/Azure only once you have specific scaling or compliance needs
+
+**File storage**
+- S3 or equivalent object storage from day one — don't store files on local disk
+
+**Payments (if needed)**
+- Stripe or similar — never build your own payment handling
+
+## 4. Suggested Architecture Diagram (Conceptual)
+
+```
+[Client: Web/Mobile]
+        |
+        v
+[Load Balancer / CDN]  <-- (often just handled by your PaaS)
+        |
+        v
+[Monolithic API Server] --- [Auth Provider]
+        |
+        +----> [PostgreSQL DB]
+        |
+        +----> [Object Storage (S3)]
+        |
+        +----> [Third-party APIs: payments, email, etc.]
+```
+
+That's it. No message queues, no microservices, no service mesh — unless your hypothesis specifically requires them (e.g., you're testing a real-time collaboration feature, which does need something like WebSockets/Pusher/Ably).
+
+## 5. Step-by-Step Build Process
+
+1. **Write down the core user flow** (2–5 screens/steps max) that proves the hypothesis.
+2. **Design the data model** — just the tables/entities needed for that flow. Resist adding "future-proofing" fields.
+3. **Pick the stack** based on team familiarity first, ecosystem maturity second.
+4. **Stand up auth and hosting** before writing feature code — these are often the most annoying to bolt on later.
+5. **Build the thinnest vertical slice** — one full flow end-to-end, even if ugly — before building breadth.
+6. **Instrument analytics from day one** (PostHog, Mixpanel, or even simple logging) — an MVP without measurement can't tell you if the hypothesis was validated.
+7. **Deploy continuously** — even a simple `git push` to your PaaS beats a manual deploy process.
+8. **Set a hard "ugly is fine" rule** for anything not in the core flow (styling, edge cases, admin tools).
+
+## 6. What to Deliberately Skip
+
+- Microservices
+- Kubernetes / container orchestration
+- Custom auth/session systems
+- Elaborate CI/CD pipelines
+- Horizontal scaling infrastructure
+- Complex caching layers
+- Multi-region deployment
+- Extensive automated test coverage (some tests on core flows, yes — 100% coverage, no)
+
+## 7. When to Evolve the Architecture
+
+Treat these as real signals, not premature optimization:
+- You have real users hitting actual performance limits (not hypothetical ones)
+- A specific service is bottlenecking releases for the rest of the team
+- You have compliance/security requirements that force isolation (e.g., handling health or financial data)
+- You've validated the hypothesis and are now scaling a proven product
+
+## 8. Common MVP Architecture Mistakes
+
+- Building for scale you don't have yet ("what if we get 1M users" — you probably won't, yet)
+- Over-abstracting code for flexibility you don't need
+- Choosing tech based on resume-building instead of team skill
+- Skipping analytics, so you can't tell if the MVP succeeded
+- No deployment pipeline, so shipping updates becomes painful
+- Ignoring basic security (auth, input validation, secrets management) because "it's just an MVP" — cutting this corner is expensive later
+
+---
+
+If you tell me more about your specific product (web app, mobile app, marketplace, SaaS, AI product, etc.) and your team's skills, I can tailor the stack and diagram much more precisely. Want me to put this into a document you can share with your team, or refine it for your specific use case?
