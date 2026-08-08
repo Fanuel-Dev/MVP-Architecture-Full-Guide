@@ -1,1 +1,140 @@
-a
+Here's a breakdown of MVP architecture for each product type — what's different, what stack fits, and what to prioritize.
+
+## 1. Web App MVP
+
+**Core need:** Fast iteration, SEO (maybe), simple deployment
+
+**Stack**
+- Frontend: Next.js / Nuxt / SvelteKit (or plain React + Vite if no SSR needed)
+- Backend: Same framework's API routes, or a separate Node/Django/Rails API
+- DB: PostgreSQL
+- Auth: Clerk / Auth0 / Supabase Auth
+- Hosting: Vercel / Netlify / Render
+- Storage: S3 or Cloudflare R2
+
+**Architecture**
+```
+[Browser] -> [Next.js Frontend + API routes] -> [PostgreSQL]
+                        |
+                        +--> [Auth Provider]
+                        +--> [S3/R2 for files]
+```
+
+**Priorities:** page load speed, mobile-responsive UI, clean core flow. Skip: SSR everywhere, complex state management (Redux) — use simple state until you need more.
+
+---
+
+## 2. Mobile App MVP
+
+**Core need:** Fast cross-platform build, offline tolerance, app store approval cycle
+
+**Stack**
+- Frontend: React Native (Expo) or Flutter — cross-platform unless native performance is the hypothesis
+- Backend: Same as web (REST/GraphQL API) — reuse if you're also building a web app
+- DB: PostgreSQL
+- Auth: Firebase Auth / Supabase Auth (both have good mobile SDKs)
+- Push notifications: Firebase Cloud Messaging / OneSignal
+- Hosting: Same backend hosting as web (Render/Fly.io) + Expo EAS for builds
+
+**Architecture**
+```
+[iOS/Android App] -> [REST API] -> [PostgreSQL]
+        |                  |
+        |                  +--> [Auth Provider]
+        +--> [Push Notification Service]
+```
+
+**Priorities:** offline-first UX if connectivity is spotty for your users, smooth onboarding (app stores punish friction), analytics from day one (mobile funnels drop off fast). Skip: native modules, custom animations, deep platform-specific features unless core to the value prop.
+
+---
+
+## 3. Marketplace MVP (two-sided: buyers + sellers)
+
+**Core need:** Matching, trust/reputation, and (usually) payments with split/escrow
+
+**Stack**
+- Frontend: Next.js (web) and/or React Native
+- Backend: Monolithic API, but modeled around two user types (buyer/seller) from the start
+- DB: PostgreSQL — model listings, transactions, and reviews as first-class entities early
+- Payments: **Stripe Connect** (built specifically for marketplace split payments/escrow) — don't build this yourself
+- Search: Postgres full-text search initially; Algolia/Meilisearch only once listings scale
+- Auth: Standard provider, but with role-based access (buyer/seller/admin)
+
+**Architecture**
+```
+[Buyer App] --\                    /-- [Seller Dashboard]
+               v                  v
+            [Monolithic API]
+               |        |       |
+               v        v       v
+         [PostgreSQL] [Stripe Connect] [Search Index]
+```
+
+**Priorities:** trust signals (reviews, verification), clear transaction state machine (pending/paid/fulfilled/disputed), notification system (buyers/sellers need to know things happened). Skip: recommendation engines, dynamic pricing, complex logistics until volume justifies it.
+
+---
+
+## 4. SaaS MVP
+
+**Core need:** Multi-tenancy, subscription billing, onboarding that converts
+
+**Stack**
+- Frontend: Next.js / React
+- Backend: Monolith, but design for tenant isolation from day one (even if just a `tenant_id`/`org_id` column)
+- DB: PostgreSQL with row-level tenant scoping
+- Billing: Stripe Billing (subscriptions, trials, invoices) — never build this yourself
+- Auth: Provider with org/team support (Clerk, WorkOS, or Auth0 — WorkOS is strong if you'll need SSO for enterprise later)
+- Hosting: Render/Fly.io/Vercel
+
+**Architecture**
+```
+[Web App] -> [API] -> [PostgreSQL: tenant-scoped tables]
+                |
+                +--> [Stripe Billing]
+                +--> [Auth/Org Provider]
+                +--> [Email: Resend/Postmark for transactional]
+```
+
+**Priorities:** clean signup → trial → paid conversion path, usage tracking (to know what to price/limit), transactional email (welcome, trial-ending, invoice). Skip: enterprise SSO, custom roles/permissions, white-labeling — until a paying customer actually asks.
+
+---
+
+## 5. AI Product MVP
+
+**Core need:** Wrapping a model (or several) reliably, managing cost/latency, handling non-deterministic output
+
+**Stack**
+- Frontend: Next.js / React (streaming UI matters — use SSE or the Vercel AI SDK)
+- Backend: Thin API layer that orchestrates calls to LLM providers — don't over-engineer this
+- Model layer: Anthropic/OpenAI API directly for MVP; only self-host models if cost or data residency force it
+- Vector DB (if RAG needed): Pinecone / Supabase pgvector / Chroma — pgvector is often enough for MVP scale
+- DB: PostgreSQL for app data (conversations, users, usage)
+- Auth: Standard provider
+- Observability: Log every prompt/response pair — you'll need this to debug quality issues
+
+**Architecture**
+```
+[Client: Web/Mobile] -> [API Layer] -> [LLM Provider API]
+                              |               |
+                              v               v
+                       [PostgreSQL]   [Vector DB (if RAG)]
+                              |
+                              +--> [Logging/Eval pipeline]
+```
+
+**Priorities:** prompt versioning (treat prompts like code — track changes), cost monitoring (LLM calls add up fast), graceful fallback when the model errs or times out, feedback loop (thumbs up/down) to know if outputs are good. Skip: fine-tuning your own model, complex agent frameworks, multi-model routing — until you've proven the single-model approach isn't good enough.
+
+---
+
+## Quick Comparison Table
+
+| Product Type | Unique Complexity | Non-Negotiable Service |
+|---|---|---|
+| Web App | SEO/perf | Hosting + DB |
+| Mobile App | App store cycle, offline | Push notifications |
+| Marketplace | Two-sided trust, split payments | Stripe Connect |
+| SaaS | Multi-tenancy, billing | Stripe Billing |
+| AI Product | Non-determinism, cost/latency | LLM provider + logging |
+
+---
+
